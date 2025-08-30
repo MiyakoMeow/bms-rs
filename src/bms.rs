@@ -76,7 +76,7 @@ pub enum BmsWarning {
 /// Output of parsing a BMS file.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct BmsOutput<T: KeyLayoutMapper = KeyLayoutBeat> {
+pub struct BmsOutput<T: KeyLayoutMapper<7, 1> = KeyLayoutBeat> {
     /// The parsed BMS data.
     pub bms: Bms<T>,
     /// Warnings that occurred during parsing.
@@ -101,7 +101,7 @@ pub struct BmsOutput<T: KeyLayoutMapper = KeyLayoutBeat> {
 /// println!("Warnings: {:?}", warnings);
 /// ```
 #[cfg(feature = "rand")]
-pub fn parse_bms<T: KeyLayoutMapper>(source: &str) -> BmsOutput<T> {
+pub fn parse_bms<T: KeyLayoutMapper<7, 1>>(source: &str) -> BmsOutput<T> {
     use rand::{SeedableRng, rngs::StdRng};
 
     // Parse BMS using default RNG and prompt handler
@@ -113,7 +113,7 @@ pub fn parse_bms<T: KeyLayoutMapper>(source: &str) -> BmsOutput<T> {
 ///
 /// This function provides a convenient way to parse a BMS file in one step.
 /// It uses the default channel parser and a custom random number generator.
-pub fn parse_bms_with_rng<T: KeyLayoutMapper>(source: &str, rng: impl Rng) -> BmsOutput<T> {
+pub fn parse_bms_with_rng<T: KeyLayoutMapper<7, 1>>(source: &str, rng: impl Rng) -> BmsOutput<T> {
     // Parse tokens using default channel parser
     let LexOutput {
         tokens,

@@ -25,7 +25,7 @@ use crate::bms::{
     command::{
         JudgeLevel, LnMode, LnType, ObjId, PlayerMode, PoorMode, Volume,
         channel::{
-            Channel, Key, NoteKind, PlayerSide,
+            Channel, NoteKind, PlayerSide, StandardKey,
             converter::KeyLayoutConverter,
             mapper::{KeyLayoutBeat, KeyLayoutMapper},
         },
@@ -55,7 +55,7 @@ use super::{
 /// A score data of BMS format.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Bms<T: KeyLayoutMapper = KeyLayoutBeat> {
+pub struct Bms<T: KeyLayoutMapper<7, 1> = KeyLayoutBeat> {
     /// The header data in the score.
     pub header: Header,
     /// The scope-defines in the score.
@@ -72,7 +72,7 @@ pub struct Bms<T: KeyLayoutMapper = KeyLayoutBeat> {
     pub _phantom: std::marker::PhantomData<T>,
 }
 
-impl<T: KeyLayoutMapper> Default for Bms<T> {
+impl<T: KeyLayoutMapper<7, 1>> Default for Bms<T> {
     fn default() -> Self {
         Self {
             header: Default::default(),
@@ -229,7 +229,7 @@ pub struct Notes {
     pub objs: HashMap<ObjId, Vec<Obj>>,
     /// Index for fast key lookup. Used for LN/landmine logic.
     /// Maps each ([`PlayerSide`], [`Key`]) pair to a sorted map of times and [`ObjId`]s for efficient note lookup.
-    pub ids_by_key: HashMap<(PlayerSide, Key), BTreeMap<ObjTime, ObjId>>,
+    pub ids_by_key: HashMap<(PlayerSide, StandardKey), BTreeMap<ObjTime, ObjId>>,
     /// The path of MIDI file, which is played as BGM while playing the score.
     #[cfg(feature = "minor-command")]
     pub midi_file: Option<PathBuf>,
@@ -333,7 +333,7 @@ pub struct Others {
     pub materials_path: Option<PathBuf>,
 }
 
-impl<T: KeyLayoutMapper> Bms<T> {
+impl<T: KeyLayoutMapper<7, 1>> Bms<T> {
     pub(crate) fn parse(
         &mut self,
         token: &TokenWithPos,
@@ -1190,7 +1190,7 @@ impl<T: KeyLayoutMapper> Bms<T> {
     }
 }
 
-impl<T: KeyLayoutMapper> Bms<T> {
+impl<T: KeyLayoutMapper<7, 1>> Bms<T> {
     /// Gets the time of last any object including visible, BGM, BPM change, section length change and so on.
     ///
     /// You can't use this to find the length of music. Because this doesn't consider that the length of sound.
@@ -1494,7 +1494,7 @@ impl Notes {
     }
 
     /// Finds next object on the key `Key` from the time `ObjTime`.
-    pub fn next_obj_by_key(&self, side: PlayerSide, key: Key, time: ObjTime) -> Option<&Obj> {
+    pub fn next_obj_by_key(&self, side: PlayerSide, key: StandardKey, time: ObjTime) -> Option<&Obj> {
         self.ids_by_key
             .get(&(side, key))?
             .range((Bound::Excluded(time), Bound::Unbounded))
@@ -1827,7 +1827,7 @@ fn volume_from_message(track: Track, message: &'_ str) -> impl Iterator<Item = (
     })
 }
 
-impl<T: KeyLayoutMapper> Bms<T> {
+impl<T: KeyLayoutMapper<7, 1>> Bms<T> {
     /// One-way converting ([`crate::bms::command::channel::PlayerSide`], [`crate::bms::command::channel::Key`]) with [`KeyLayoutConverter`].
     pub fn convert_key(&mut self, mut converter: impl KeyLayoutConverter) {
         for (_, objs) in self.notes.objs.iter_mut() {

@@ -10,7 +10,7 @@ use thiserror::Error;
 
 use crate::bms::command::{
     ObjId,
-    channel::{Key, NoteKind, PlayerSide},
+    channel::{NoteKind, PlayerSide, StandardKey},
     time::ObjTime,
 };
 
@@ -49,7 +49,7 @@ pub enum ValidityInvalid {
         /// Player side where the note is placed.
         side: PlayerSide,
         /// Key lane where the note is placed.
-        key: Key,
+        key: StandardKey,
         /// Timestamp of the note.
         time: ObjTime,
     },
@@ -59,7 +59,7 @@ pub enum ValidityInvalid {
         /// Player side where the note is placed.
         side: PlayerSide,
         /// Key lane where the overlap occurs.
-        key: Key,
+        key: StandardKey,
         /// Timestamp of the overlap.
         time: ObjTime,
     },
@@ -71,7 +71,7 @@ pub enum ValidityInvalid {
         /// Player side where the note is placed.
         side: PlayerSide,
         /// Key lane where the overlap occurs.
-        key: Key,
+        key: StandardKey,
         /// Timestamp of the single note.
         time: ObjTime,
         /// Start time of the long note interval.
@@ -87,7 +87,7 @@ pub enum ValidityInvalid {
         /// Player side where the overlap occurs.
         side: PlayerSide,
         /// Key lane where the overlap occurs.
-        key: Key,
+        key: StandardKey,
         /// Start time of the long note interval.
         ln_start: ObjTime,
         /// End time of the long note interval.
@@ -99,7 +99,7 @@ pub enum ValidityInvalid {
         /// Player side where the overlap occurs.
         side: PlayerSide,
         /// Key lane where the overlap occurs.
-        key: Key,
+        key: StandardKey,
         /// Timestamp of the overlap.
         time: ObjTime,
     },
@@ -167,7 +167,7 @@ impl Bms {
         //      - Overlap: visible single within long interval (same lane)
         //      - Overlap: landmine vs single (same time, same lane)
         //      - Overlap: landmine within long interval -> warn once at long start
-        let mut lane_to_notes: HashMap<(PlayerSide, Key), Vec<&Obj>> = HashMap::new();
+        let mut lane_to_notes: HashMap<(PlayerSide, StandardKey), Vec<&Obj>> = HashMap::new();
         for notes in self.notes.objs.values() {
             for obj in notes {
                 // Visible note in section 000 (track index 0)

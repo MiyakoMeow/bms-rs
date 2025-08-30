@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use super::{Key, PlayerSide, mapper::KeyMapping};
+use super::{PlayerSide, StandardKey, mapper::KeyMapping};
 
 /// A trait for converting [`KeyMapping`]s.
 ///
@@ -11,12 +11,12 @@ use super::{Key, PlayerSide, mapper::KeyMapping};
 ///   - [`KeyLayoutConverter`] can convert into another key layout. It's one-way.
 pub trait KeyLayoutConverter {
     /// Convert a [`KeyMapping`] to another key layout.
-    fn convert<T: KeyMapping>(&mut self, beat_map: T) -> T;
+    fn convert<T: KeyMapping<7, 1>>(&mut self, beat_map: T) -> T;
 }
 
 impl KeyLayoutConvertMirror {
     /// Create a new [`KeyLayoutConvertMirror`] with the given [`PlayerSide`] and [`Key`]s.
-    pub fn new(side: PlayerSide, keys: Vec<Key>) -> Self {
+    pub fn new(side: PlayerSide, keys: Vec<StandardKey>) -> Self {
         Self { side, keys }
     }
 }
@@ -27,11 +27,11 @@ pub struct KeyLayoutConvertMirror {
     /// The side of the player to mirror.
     side: PlayerSide,
     /// A list of [`Key`]s to mirror. Usually, it should be the keys that actually used in the song.
-    keys: Vec<Key>,
+    keys: Vec<StandardKey>,
 }
 
 impl KeyLayoutConverter for KeyLayoutConvertMirror {
-    fn convert<T: KeyMapping>(&mut self, beat_map: T) -> T {
+    fn convert<T: KeyMapping<7, 1>>(&mut self, beat_map: T) -> T {
         let (side, kind, mut key) = beat_map.into_tuple();
         if side == self.side
             && let Some(position) = self.keys.iter().position(|k| k == &key)
@@ -103,21 +103,21 @@ pub struct KeyLayoutConvertLaneRotateShuffle {
     /// The side of the player to shuffle.
     side: PlayerSide,
     /// A map of [`Key`]s to their new [`Key`]s.
-    arrangement: HashMap<Key, Key>,
+    arrangement: HashMap<StandardKey, StandardKey>,
 }
 
 impl KeyLayoutConvertLaneRotateShuffle {
     /// Create a new [`KeyLayoutConvertLaneRotateShuffle`] with the given [`PlayerSide`], [`Key`]s and seed.
-    pub fn new(side: PlayerSide, keys: Vec<Key>, seed: i64) -> Self {
+    pub fn new(side: PlayerSide, keys: Vec<StandardKey>, seed: i64) -> Self {
         KeyLayoutConvertLaneRotateShuffle {
             side,
             arrangement: Self::make_random(&keys, seed),
         }
     }
 
-    fn make_random(keys: &[Key], seed: i64) -> HashMap<Key, Key> {
+    fn make_random(keys: &[StandardKey], seed: i64) -> HashMap<StandardKey, StandardKey> {
         let mut rng = JavaRandom::new(seed);
-        let mut result: HashMap<Key, Key> = HashMap::new();
+        let mut result: HashMap<StandardKey, StandardKey> = HashMap::new();
         if keys.is_empty() {
             return result;
         }
@@ -139,7 +139,7 @@ impl KeyLayoutConvertLaneRotateShuffle {
 }
 
 impl KeyLayoutConverter for KeyLayoutConvertLaneRotateShuffle {
-    fn convert<T: KeyMapping>(&mut self, beat_map: T) -> T {
+    fn convert<T: KeyMapping<7, 1>>(&mut self, beat_map: T) -> T {
         let (side, kind, key) = beat_map.into_tuple();
         if side == self.side {
             let new_key = self.arrangement.get(&key).copied().unwrap_or(key);
@@ -158,21 +158,21 @@ pub struct KeyLayoutConvertLaneRandomShuffle {
     /// The side of the player to shuffle.
     side: PlayerSide,
     /// A map of [`Key`]s to their new [`Key`]s.
-    arrangement: HashMap<Key, Key>,
+    arrangement: HashMap<StandardKey, StandardKey>,
 }
 
 impl KeyLayoutConvertLaneRandomShuffle {
     /// Create a new [`KeyLayoutConvertLaneRandomShuffle`] with the given [`PlayerSide`], [`Key`]s and seed.
-    pub fn new(side: PlayerSide, keys: Vec<Key>, seed: i64) -> Self {
+    pub fn new(side: PlayerSide, keys: Vec<StandardKey>, seed: i64) -> Self {
         KeyLayoutConvertLaneRandomShuffle {
             side,
             arrangement: Self::make_random(&keys, seed),
         }
     }
 
-    fn make_random(keys: &[Key], seed: i64) -> HashMap<Key, Key> {
+    fn make_random(keys: &[StandardKey], seed: i64) -> HashMap<StandardKey, StandardKey> {
         let mut rng = JavaRandom::new(seed);
-        let mut result: HashMap<Key, Key> = HashMap::new();
+        let mut result: HashMap<StandardKey, StandardKey> = HashMap::new();
         if keys.is_empty() {
             return result;
         }
@@ -189,7 +189,7 @@ impl KeyLayoutConvertLaneRandomShuffle {
 }
 
 impl KeyLayoutConverter for KeyLayoutConvertLaneRandomShuffle {
-    fn convert<T: KeyMapping>(&mut self, beat_map: T) -> T {
+    fn convert<T: KeyMapping<7, 1>>(&mut self, beat_map: T) -> T {
         let (side, kind, key) = beat_map.into_tuple();
         if side == self.side {
             let new_key = self.arrangement.get(&key).copied().unwrap_or(key);
@@ -210,36 +210,40 @@ mod channel_mode_tests {
     fn test_key_channel_mode_mirror() {
         // Test 1: 3 keys
         let keys = vec![
-            (PlayerSide::Player1, Key::Key(1)),
-            (PlayerSide::Player1, Key::Key(2)),
-            (PlayerSide::Player1, Key::Key(3)),
-            (PlayerSide::Player1, Key::Key(4)),
-            (PlayerSide::Player1, Key::Key(5)),
-            (PlayerSide::Player2, Key::Key(1)),
-            (PlayerSide::Player2, Key::Key(2)),
-            (PlayerSide::Player2, Key::Key(3)),
-            (PlayerSide::Player2, Key::Key(4)),
-            (PlayerSide::Player2, Key::Key(5)),
+            (PlayerSide::Player1, StandardKey::Key(1)),
+            (PlayerSide::Player1, StandardKey::Key(2)),
+            (PlayerSide::Player1, StandardKey::Key(3)),
+            (PlayerSide::Player1, StandardKey::Key(4)),
+            (PlayerSide::Player1, StandardKey::Key(5)),
+            (PlayerSide::Player2, StandardKey::Key(1)),
+            (PlayerSide::Player2, StandardKey::Key(2)),
+            (PlayerSide::Player2, StandardKey::Key(3)),
+            (PlayerSide::Player2, StandardKey::Key(4)),
+            (PlayerSide::Player2, StandardKey::Key(5)),
         ]
         .into_iter()
         .map(|(side, key)| KeyLayoutBeat::new(side, NoteKind::Visible, key))
         .collect::<Vec<_>>();
         let mut mode = KeyLayoutConvertMirror {
             side: PlayerSide::Player1,
-            keys: vec![Key::Key(1), Key::Key(2), Key::Key(3)],
+            keys: vec![
+                StandardKey::Key(1),
+                StandardKey::Key(2),
+                StandardKey::Key(3),
+            ],
         };
         let result = keys.iter().map(|k| mode.convert(*k)).collect::<Vec<_>>();
         let expected = vec![
-            (PlayerSide::Player1, Key::Key(3)),
-            (PlayerSide::Player1, Key::Key(2)),
-            (PlayerSide::Player1, Key::Key(1)),
-            (PlayerSide::Player1, Key::Key(4)),
-            (PlayerSide::Player1, Key::Key(5)),
-            (PlayerSide::Player2, Key::Key(1)),
-            (PlayerSide::Player2, Key::Key(2)),
-            (PlayerSide::Player2, Key::Key(3)),
-            (PlayerSide::Player2, Key::Key(4)),
-            (PlayerSide::Player2, Key::Key(5)),
+            (PlayerSide::Player1, StandardKey::Key(3)),
+            (PlayerSide::Player1, StandardKey::Key(2)),
+            (PlayerSide::Player1, StandardKey::Key(1)),
+            (PlayerSide::Player1, StandardKey::Key(4)),
+            (PlayerSide::Player1, StandardKey::Key(5)),
+            (PlayerSide::Player2, StandardKey::Key(1)),
+            (PlayerSide::Player2, StandardKey::Key(2)),
+            (PlayerSide::Player2, StandardKey::Key(3)),
+            (PlayerSide::Player2, StandardKey::Key(4)),
+            (PlayerSide::Player2, StandardKey::Key(5)),
         ]
         .into_iter()
         .map(|(side, key)| KeyLayoutBeat::new(side, NoteKind::Visible, key))
@@ -298,13 +302,13 @@ mod channel_mode_tests {
         for (i, (list, seed)) in examples.iter().enumerate() {
             println!("Test case {}: seed = {}", i, seed);
             let init_keys = [
-                Key::Key(1),
-                Key::Key(2),
-                Key::Key(3),
-                Key::Key(4),
-                Key::Key(5),
-                Key::Key(6),
-                Key::Key(7),
+                StandardKey::Key(1),
+                StandardKey::Key(2),
+                StandardKey::Key(3),
+                StandardKey::Key(4),
+                StandardKey::Key(5),
+                StandardKey::Key(6),
+                StandardKey::Key(7),
             ];
             let mut rnd = KeyLayoutConvertLaneRandomShuffle::new(
                 PlayerSide::Player1,
@@ -321,10 +325,10 @@ mod channel_mode_tests {
                     ))
                 })
                 .map(|v| match v.key() {
-                    Key::Key(n) => n as usize,
-                    Key::Scratch(n) => n as usize + 10,
-                    Key::FootPedal => 20,
-                    Key::FreeZone => 21,
+                    StandardKey::Key(n) => n as usize,
+                    StandardKey::Scratch(n) => n as usize + 10,
+                    StandardKey::FootPedal => 20,
+                    StandardKey::FreeZone => 21,
                 })
                 .collect::<Vec<_>>();
             println!("  Expected: {:?}", list);

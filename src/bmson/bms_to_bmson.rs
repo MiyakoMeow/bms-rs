@@ -6,7 +6,10 @@ use num::ToPrimitive;
 use thiserror::Error;
 
 use crate::{
-    bms::prelude::*,
+    bms::{
+        command::channel::StandardKey,
+        prelude::*,
+    },
     bmson::{
         BarLine, Bga, BgaEvent, BgaHeader, BgaId, Bmson, BmsonInfo, BpmEvent, KeyChannel, KeyEvent,
         MineChannel, MineEvent, Note, ScrollEvent, SoundChannel, StopEvent, fin_f64::FinF64,
@@ -192,16 +195,16 @@ impl Bms {
                     .is_playable()
                     .then_some(
                         match note.key {
-                            Key::Key(1) => 1,
-                            Key::Key(2) => 2,
-                            Key::Key(3) => 3,
-                            Key::Key(4) => 4,
-                            Key::Key(5) => 5,
-                            Key::Key(6) => 6,
-                            Key::Key(7) => 7,
-                            Key::Scratch(_) | Key::FreeZone => 8,
+                            StandardKey::Key(1) => 1,
+                            StandardKey::Key(2) => 2,
+                            StandardKey::Key(3) => 3,
+                            StandardKey::Key(4) => 4,
+                            StandardKey::Key(5) => 5,
+                            StandardKey::Key(6) => 6,
+                            StandardKey::Key(7) => 7,
+                            StandardKey::Scratch(_) | StandardKey::FreeZone => 8,
                             // TODO: Extra key convertion
-                            Key::Key(_) | Key::FootPedal => 0,
+                            StandardKey::Key(_) | StandardKey::FootPedal => 0,
                         } + match note.side {
                             PlayerSide::Player1 => 0,
                             PlayerSide::Player2 => 8,

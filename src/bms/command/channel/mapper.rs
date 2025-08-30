@@ -1,6 +1,6 @@
 //! For converting key/channel between different modes, please see [`KeyLayoutMapper`] enum and [`convert_key_mapping_between`] function.
 
-use super::{ChannelId, Key, NoteKind, PlayerSide};
+use super::{ChannelId, Key, NoteKind, PlayerSide, StandardKey};
 use Key::*;
 
 /// Convert from KeyLayoutBeat to ChannelId.
@@ -73,24 +73,26 @@ fn channel_id_to_key_layout_beat(channel_id: ChannelId) -> Option<KeyLayoutBeat>
 }
 
 /// A trait for key mapping storage structure.
-pub trait KeyMapping {
+pub trait KeyMapping<const KEY_COUNT: u8, const SCRATCH_COUNT: u8> {
     /// Create a new [`KeyMapping`] from a [`PlayerSide`], [`NoteKind`] and [`Key`].
-    fn new(side: PlayerSide, kind: NoteKind, key: Key) -> Self;
+    fn new(side: PlayerSide, kind: NoteKind, key: Key<KEY_COUNT, SCRATCH_COUNT>) -> Self;
     /// Get the PlayerSide from this KeyMapping.
     fn side(&self) -> PlayerSide;
     /// Get the NoteKind from this KeyMapping.
     fn kind(&self) -> NoteKind;
     /// Get the [`Key`] from this [`KeyMapping`].
-    fn key(&self) -> Key;
+    fn key(&self) -> Key<KEY_COUNT, SCRATCH_COUNT>;
     /// Deconstruct into a [`PlayerSide`], [`NoteKind`], [`Key`] tuple.
-    fn into_tuple(self) -> (PlayerSide, NoteKind, Key);
+    fn into_tuple(self) -> (PlayerSide, NoteKind, Key<KEY_COUNT, SCRATCH_COUNT>);
 }
 /// Trait for key channel mode implementations.
 ///
 /// This trait defines the interface for converting between different key channel modes
 /// and the standard ChannelId format. Each mode implementation should provide methods to
 /// convert from its own format to ChannelId format and vice versa.
-pub trait KeyLayoutMapper: KeyMapping {
+pub trait KeyLayoutMapper<const KEY_COUNT: u8, const SCRATCH_COUNT: u8>:
+    KeyMapping<KEY_COUNT, SCRATCH_COUNT>
+{
     /// Convert from this mode's format to ChannelId format.
     ///
     /// This method takes a (PlayerSide, NoteKind, Key) tuple in this mode's format and converts
@@ -112,10 +114,10 @@ pub trait KeyLayoutMapper: KeyMapping {
 /// - Lanes:
 ///   - Chars: '1'..'7','6' scratch, '7' free zone, '8'->Key6, '9'->Key7
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct KeyLayoutBeat(pub PlayerSide, pub NoteKind, pub Key);
+pub struct KeyLayoutBeat(pub PlayerSide, pub NoteKind, pub StandardKey);
 
-impl KeyMapping for KeyLayoutBeat {
-    fn new(side: PlayerSide, kind: NoteKind, key: Key) -> Self {
+impl KeyMapping<7, 1> for KeyLayoutBeat {
+    fn new(side: PlayerSide, kind: NoteKind, key: Key<7, 1>) -> Self {
         KeyLayoutBeat(side, kind, key)
     }
 
@@ -127,16 +129,16 @@ impl KeyMapping for KeyLayoutBeat {
         self.1
     }
 
-    fn key(&self) -> Key {
+    fn key(&self) -> Key<7, 1> {
         self.2
     }
 
-    fn into_tuple(self) -> (PlayerSide, NoteKind, Key) {
+    fn into_tuple(self) -> (PlayerSide, NoteKind, Key<7, 1>) {
         (self.0, self.1, self.2)
     }
 }
 
-impl KeyLayoutMapper for KeyLayoutBeat {
+impl KeyLayoutMapper<7, 1> for KeyLayoutBeat {
     fn to_channel_id(self) -> ChannelId {
         key_layout_beat_to_channel_id(self)
     }
@@ -151,10 +153,10 @@ impl KeyLayoutMapper for KeyLayoutBeat {
 /// - Lanes:
 ///   - Chars: '1'..'9', '6'->Key8, '7'->Key9, '8'->Key6, '9'->Key7
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct KeyLayoutPmsBmeType(pub PlayerSide, pub NoteKind, pub Key);
+pub struct KeyLayoutPmsBmeType(pub PlayerSide, pub NoteKind, pub StandardKey);
 
-impl KeyMapping for KeyLayoutPmsBmeType {
-    fn new(side: PlayerSide, kind: NoteKind, key: Key) -> Self {
+impl KeyMapping<7, 1> for KeyLayoutPmsBmeType {
+    fn new(side: PlayerSide, kind: NoteKind, key: Key<7, 1>) -> Self {
         KeyLayoutPmsBmeType(side, kind, key)
     }
 
@@ -166,21 +168,21 @@ impl KeyMapping for KeyLayoutPmsBmeType {
         self.1
     }
 
-    fn key(&self) -> Key {
+    fn key(&self) -> Key<7, 1> {
         self.2
     }
 
-    fn into_tuple(self) -> (PlayerSide, NoteKind, Key) {
+    fn into_tuple(self) -> (PlayerSide, NoteKind, Key<7, 1>) {
         (self.0, self.1, self.2)
     }
 }
 
-impl KeyLayoutMapper for KeyLayoutPmsBmeType {
+impl KeyLayoutMapper<7, 1> for KeyLayoutPmsBmeType {
     fn to_channel_id(self) -> ChannelId {
         let (side, kind, key) = self.into_tuple();
         let key = match key {
-            Key(8) => Scratch(1),
-            Key(9) => FreeZone,
+            StandardKey::Key(8) => StandardKey::Scratch(1),
+            StandardKey::Key(9) => StandardKey::FreeZone,
             other => other,
         };
         let beat = KeyLayoutBeat::new(side, kind, key);
@@ -205,10 +207,10 @@ impl KeyLayoutMapper for KeyLayoutPmsBmeType {
 ///   - Beat -> this: (P2,Key2..Key5) remapped to (P1,Key6..Key9); (P1,Key1..Key5) unchanged
 ///   - This -> Beat: Key6..Key9 => (P2,Key2..Key5); Key1..Key5 => (P1,Key1..Key5)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct KeyLayoutPms(pub PlayerSide, pub NoteKind, pub Key);
+pub struct KeyLayoutPms(pub PlayerSide, pub NoteKind, pub StandardKey);
 
-impl KeyMapping for KeyLayoutPms {
-    fn new(side: PlayerSide, kind: NoteKind, key: Key) -> Self {
+impl KeyMapping<7, 1> for KeyLayoutPms {
+    fn new(side: PlayerSide, kind: NoteKind, key: Key<7, 1>) -> Self {
         KeyLayoutPms(side, kind, key)
     }
 
@@ -220,25 +222,32 @@ impl KeyMapping for KeyLayoutPms {
         self.1
     }
 
-    fn key(&self) -> Key {
+    fn key(&self) -> Key<7, 1> {
         self.2
     }
 
-    fn into_tuple(self) -> (PlayerSide, NoteKind, Key) {
+    fn into_tuple(self) -> (PlayerSide, NoteKind, Key<7, 1>) {
         (self.0, self.1, self.2)
     }
 }
 
-impl KeyLayoutMapper for KeyLayoutPms {
+impl KeyLayoutMapper<7, 1> for KeyLayoutPms {
     fn to_channel_id(self) -> ChannelId {
         use PlayerSide::*;
         let (side, kind, key) = self.into_tuple();
         let (side, key) = match (side, key) {
-            (Player1, Key(1) | Key(2) | Key(3) | Key(4) | Key(5)) => (Player1, key),
-            (Player1, Key(6)) => (Player2, Key(2)),
-            (Player1, Key(7)) => (Player2, Key(3)),
-            (Player1, Key(8)) => (Player2, Key(4)),
-            (Player1, Key(9)) => (Player2, Key(5)),
+            (
+                Player1,
+                StandardKey::Key(1)
+                | StandardKey::Key(2)
+                | StandardKey::Key(3)
+                | StandardKey::Key(4)
+                | StandardKey::Key(5),
+            ) => (Player1, key),
+            (Player1, StandardKey::Key(6)) => (Player2, StandardKey::Key(2)),
+            (Player1, StandardKey::Key(7)) => (Player2, StandardKey::Key(3)),
+            (Player1, StandardKey::Key(8)) => (Player2, StandardKey::Key(4)),
+            (Player1, StandardKey::Key(9)) => (Player2, StandardKey::Key(5)),
             other => other,
         };
         let beat = KeyLayoutBeat::new(side, kind, key);
@@ -250,11 +259,18 @@ impl KeyLayoutMapper for KeyLayoutPms {
         use PlayerSide::*;
         let (side, kind, key) = beat.into_tuple();
         let (side, key) = match (side, key) {
-            (Player1, Key(1) | Key(2) | Key(3) | Key(4) | Key(5)) => (Player1, key),
-            (Player2, Key(2)) => (Player1, Key(6)),
-            (Player2, Key(3)) => (Player1, Key(7)),
-            (Player2, Key(4)) => (Player1, Key(8)),
-            (Player2, Key(5)) => (Player1, Key(9)),
+            (
+                Player1,
+                StandardKey::Key(1)
+                | StandardKey::Key(2)
+                | StandardKey::Key(3)
+                | StandardKey::Key(4)
+                | StandardKey::Key(5),
+            ) => (Player1, key),
+            (Player2, StandardKey::Key(2)) => (Player1, StandardKey::Key(6)),
+            (Player2, StandardKey::Key(3)) => (Player1, StandardKey::Key(7)),
+            (Player2, StandardKey::Key(4)) => (Player1, StandardKey::Key(8)),
+            (Player2, StandardKey::Key(5)) => (Player1, StandardKey::Key(9)),
             other => other,
         };
         Some(KeyLayoutPms::new(side, kind, key))
@@ -267,10 +283,10 @@ impl KeyLayoutMapper for KeyLayoutPms {
 ///   - Beat -> this: FreeZone=>FootPedal
 ///   - This -> Beat: FootPedal=>FreeZone
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct KeyLayoutBeatNanasi(pub PlayerSide, pub NoteKind, pub Key);
+pub struct KeyLayoutBeatNanasi(pub PlayerSide, pub NoteKind, pub StandardKey);
 
-impl KeyMapping for KeyLayoutBeatNanasi {
-    fn new(side: PlayerSide, kind: NoteKind, key: Key) -> Self {
+impl KeyMapping<7, 1> for KeyLayoutBeatNanasi {
+    fn new(side: PlayerSide, kind: NoteKind, key: Key<7, 1>) -> Self {
         KeyLayoutBeatNanasi(side, kind, key)
     }
 
@@ -282,16 +298,16 @@ impl KeyMapping for KeyLayoutBeatNanasi {
         self.1
     }
 
-    fn key(&self) -> Key {
+    fn key(&self) -> Key<7, 1> {
         self.2
     }
 
-    fn into_tuple(self) -> (PlayerSide, NoteKind, Key) {
+    fn into_tuple(self) -> (PlayerSide, NoteKind, Key<7, 1>) {
         (self.0, self.1, self.2)
     }
 }
 
-impl KeyLayoutMapper for KeyLayoutBeatNanasi {
+impl KeyLayoutMapper<7, 1> for KeyLayoutBeatNanasi {
     fn to_channel_id(self) -> ChannelId {
         let (side, kind, key) = self.into_tuple();
         let key = match key {
@@ -319,10 +335,10 @@ impl KeyLayoutMapper for KeyLayoutBeatNanasi {
 ///   - Beat -> this: (P2,Key1)=>FootPedal, (P2,Key2..Key7)=>Key8..Key13, (P2,Scratch)=>ScratchExtra; (P1,Key1..Key7|Scratch) unchanged; side becomes P1
 ///   - This -> Beat: reverse of above
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct KeyLayoutDscOctFp(pub PlayerSide, pub NoteKind, pub Key);
+pub struct KeyLayoutDscOctFp(pub PlayerSide, pub NoteKind, pub StandardKey);
 
-impl KeyMapping for KeyLayoutDscOctFp {
-    fn new(side: PlayerSide, kind: NoteKind, key: Key) -> Self {
+impl KeyMapping<7, 1> for KeyLayoutDscOctFp {
+    fn new(side: PlayerSide, kind: NoteKind, key: Key<7, 1>) -> Self {
         KeyLayoutDscOctFp(side, kind, key)
     }
 
@@ -334,32 +350,39 @@ impl KeyMapping for KeyLayoutDscOctFp {
         self.1
     }
 
-    fn key(&self) -> Key {
+    fn key(&self) -> Key<7, 1> {
         self.2
     }
 
-    fn into_tuple(self) -> (PlayerSide, NoteKind, Key) {
+    fn into_tuple(self) -> (PlayerSide, NoteKind, Key<7, 1>) {
         (self.0, self.1, self.2)
     }
 }
 
-impl KeyLayoutMapper for KeyLayoutDscOctFp {
+impl KeyLayoutMapper<7, 1> for KeyLayoutDscOctFp {
     fn to_channel_id(self) -> ChannelId {
         use PlayerSide::*;
         let (side, kind, key) = self.into_tuple();
         let (side, key) = match (side, key) {
             (
                 Player1,
-                Key(1) | Key(2) | Key(3) | Key(4) | Key(5) | Key(6) | Key(7) | Scratch(1),
+                StandardKey::Key(1)
+                | StandardKey::Key(2)
+                | StandardKey::Key(3)
+                | StandardKey::Key(4)
+                | StandardKey::Key(5)
+                | StandardKey::Key(6)
+                | StandardKey::Key(7)
+                | StandardKey::Scratch(1),
             ) => (Player1, key),
-            (Player1, Scratch(2)) => (Player2, Scratch(1)),
-            (Player1, FootPedal) => (Player2, Key(1)),
-            (Player1, Key(8)) => (Player2, Key(2)),
-            (Player1, Key(9)) => (Player2, Key(3)),
-            (Player1, Key(10)) => (Player2, Key(4)),
-            (Player1, Key(11)) => (Player2, Key(5)),
-            (Player1, Key(12)) => (Player2, Key(6)),
-            (Player1, Key(13)) => (Player2, Key(7)),
+            (Player1, StandardKey::Scratch(2)) => (Player2, StandardKey::Scratch(1)),
+            (Player1, StandardKey::FootPedal) => (Player2, StandardKey::Key(1)),
+            (Player1, StandardKey::Key(8)) => (Player2, StandardKey::Key(2)),
+            (Player1, StandardKey::Key(9)) => (Player2, StandardKey::Key(3)),
+            (Player1, StandardKey::Key(10)) => (Player2, StandardKey::Key(4)),
+            (Player1, StandardKey::Key(11)) => (Player2, StandardKey::Key(5)),
+            (Player1, StandardKey::Key(12)) => (Player2, StandardKey::Key(6)),
+            (Player1, StandardKey::Key(13)) => (Player2, StandardKey::Key(7)),
             (s, other) => (s, other),
         };
         let beat = KeyLayoutBeat::new(side, kind, key);
@@ -373,16 +396,23 @@ impl KeyLayoutMapper for KeyLayoutDscOctFp {
         let (side, key) = match (side, key) {
             (
                 Player1,
-                Key(1) | Key(2) | Key(3) | Key(4) | Key(5) | Key(6) | Key(7) | Scratch(1),
+                StandardKey::Key(1)
+                | StandardKey::Key(2)
+                | StandardKey::Key(3)
+                | StandardKey::Key(4)
+                | StandardKey::Key(5)
+                | StandardKey::Key(6)
+                | StandardKey::Key(7)
+                | StandardKey::Scratch(1),
             ) => (Player1, key),
-            (Player2, Key(1)) => (Player1, FootPedal),
-            (Player2, Key(2)) => (Player1, Key(8)),
-            (Player2, Key(3)) => (Player1, Key(9)),
-            (Player2, Key(4)) => (Player1, Key(10)),
-            (Player2, Key(5)) => (Player1, Key(11)),
-            (Player2, Key(6)) => (Player1, Key(12)),
-            (Player2, Key(7)) => (Player1, Key(13)),
-            (Player2, Scratch(1)) => (Player1, Scratch(2)),
+            (Player2, StandardKey::Key(1)) => (Player1, StandardKey::FootPedal),
+            (Player2, StandardKey::Key(2)) => (Player1, StandardKey::Key(8)),
+            (Player2, StandardKey::Key(3)) => (Player1, StandardKey::Key(9)),
+            (Player2, StandardKey::Key(4)) => (Player1, StandardKey::Key(10)),
+            (Player2, StandardKey::Key(5)) => (Player1, StandardKey::Key(11)),
+            (Player2, StandardKey::Key(6)) => (Player1, StandardKey::Key(12)),
+            (Player2, StandardKey::Key(7)) => (Player1, StandardKey::Key(13)),
+            (Player2, StandardKey::Scratch(1)) => (Player1, StandardKey::Scratch(2)),
             (s, k) => (s, k),
         };
         Some(KeyLayoutDscOctFp::new(side, kind, key))

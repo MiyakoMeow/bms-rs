@@ -282,7 +282,7 @@ impl ChannelId {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
-pub enum Key {
+pub enum Key<const KEY_COUNT: u8, const SCRATCH_COUNT: u8> {
     /// The keys for the controller.
     Key(u8),
     /// The scratch disk.
@@ -294,7 +294,10 @@ pub enum Key {
     FreeZone,
 }
 
-impl Key {
+/// Default Key type with 7 keys and 1 scratch
+pub type StandardKey = Key<7, 1>;
+
+impl<const KEY_COUNT: u8, const SCRATCH_COUNT: u8> Key<{ KEY_COUNT }, { SCRATCH_COUNT }> {
     /// Returns whether the key expected a piano keyboard.
     pub const fn is_keyxx(&self) -> bool {
         matches!(self, Self::Key(_))

@@ -51,7 +51,7 @@ pub struct PlayingCheckOutput {
     pub playing_errors: Vec<PlayingError>,
 }
 
-impl<T: KeyLayoutMapper> Bms<T> {
+impl<T: KeyLayoutMapper<7, 1>> Bms<T> {
     /// Check for playing warnings and errors based on the parsed BMS data.
     pub fn check_playing(&self) -> PlayingCheckOutput {
         let mut playing_warnings = Vec::new();
