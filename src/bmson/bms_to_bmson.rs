@@ -6,10 +6,7 @@ use num::ToPrimitive;
 use thiserror::Error;
 
 use crate::{
-    bms::{
-        command::channel::StandardKey,
-        prelude::*,
-    },
+    bms::{command::channel::StandardKey, prelude::*},
     bmson::{
         BarLine, Bga, BgaEvent, BgaHeader, BgaId, Bmson, BmsonInfo, BpmEvent, KeyChannel, KeyEvent,
         MineChannel, MineEvent, Note, ScrollEvent, SoundChannel, StopEvent, fin_f64::FinF64,

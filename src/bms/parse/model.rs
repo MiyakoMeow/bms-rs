@@ -1494,7 +1494,12 @@ impl Notes {
     }
 
     /// Finds next object on the key `Key` from the time `ObjTime`.
-    pub fn next_obj_by_key(&self, side: PlayerSide, key: StandardKey, time: ObjTime) -> Option<&Obj> {
+    pub fn next_obj_by_key(
+        &self,
+        side: PlayerSide,
+        key: StandardKey,
+        time: ObjTime,
+    ) -> Option<&Obj> {
         self.ids_by_key
             .get(&(side, key))?
             .range((Bound::Excluded(time), Bound::Unbounded))

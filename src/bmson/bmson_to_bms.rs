@@ -5,10 +5,7 @@ use std::{num::NonZeroU8, path::PathBuf};
 use thiserror::Error;
 
 use crate::{
-    bms::{
-        command::channel::StandardKey,
-        prelude::*,
-    },
+    bms::{command::channel::StandardKey, prelude::*},
     bmson::{BgaId, Bmson, pulse::PulseNumber},
 };
 
