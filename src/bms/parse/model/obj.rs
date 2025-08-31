@@ -3,7 +3,7 @@ use crate::bms::{
     Decimal,
     command::{
         JudgeLevel, ObjId,
-        channel::{Channel, NoteKind, PlayerSide, StandardKey},
+        channel::{Channel, Key, NoteKind, PlayerSide},
         time::{ObjTime, Track},
     },
 };
@@ -22,7 +22,7 @@ pub struct Obj {
     /// The side of the player.
     pub side: PlayerSide,
     /// The key, or lane, where the object is placed.
-    pub key: StandardKey,
+    pub key: Key<7, 1>,
     /// The id of the object.
     pub obj: ObjId,
 }

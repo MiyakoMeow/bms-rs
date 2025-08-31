@@ -25,7 +25,7 @@ use crate::bms::{
     command::{
         JudgeLevel, LnMode, LnType, ObjId, PlayerMode, PoorMode, Volume,
         channel::{
-            Channel, NoteKind, PlayerSide, StandardKey,
+            Channel, Key, NoteKind, PlayerSide,
             converter::KeyLayoutConverter,
             mapper::{KeyLayoutBeat, KeyLayoutMapper},
         },
@@ -229,7 +229,7 @@ pub struct Notes {
     pub objs: HashMap<ObjId, Vec<Obj>>,
     /// Index for fast key lookup. Used for LN/landmine logic.
     /// Maps each ([`PlayerSide`], [`Key`]) pair to a sorted map of times and [`ObjId`]s for efficient note lookup.
-    pub ids_by_key: HashMap<(PlayerSide, StandardKey), BTreeMap<ObjTime, ObjId>>,
+    pub ids_by_key: HashMap<(PlayerSide, Key<7, 1>), BTreeMap<ObjTime, ObjId>>,
     /// The path of MIDI file, which is played as BGM while playing the score.
     #[cfg(feature = "minor-command")]
     pub midi_file: Option<PathBuf>,
@@ -1494,12 +1494,7 @@ impl Notes {
     }
 
     /// Finds next object on the key `Key` from the time `ObjTime`.
-    pub fn next_obj_by_key(
-        &self,
-        side: PlayerSide,
-        key: StandardKey,
-        time: ObjTime,
-    ) -> Option<&Obj> {
+    pub fn next_obj_by_key(&self, side: PlayerSide, key: Key<7, 1>, time: ObjTime) -> Option<&Obj> {
         self.ids_by_key
             .get(&(side, key))?
             .range((Bound::Excluded(time), Bound::Unbounded))

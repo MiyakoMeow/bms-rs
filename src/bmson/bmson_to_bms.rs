@@ -5,7 +5,7 @@ use std::{num::NonZeroU8, path::PathBuf};
 use thiserror::Error;
 
 use crate::{
-    bms::{command::channel::StandardKey, prelude::*},
+    bms::{command::channel::Key, prelude::*},
     bmson::{BgaId, Bmson, pulse::PulseNumber},
 };
 
@@ -334,7 +334,7 @@ fn convert_pulse_to_obj_time(pulse: PulseNumber, resolution: u64) -> ObjTime {
 }
 
 /// Convert lane number to Key and PlayerSide
-fn convert_lane_to_key_side(lane: Option<NonZeroU8>) -> (StandardKey, PlayerSide) {
+fn convert_lane_to_key_side(lane: Option<NonZeroU8>) -> (Key<7, 1>, PlayerSide) {
     let lane_value = lane.map(|l| l.get()).unwrap_or(0);
 
     // Handle player sides
@@ -346,15 +346,15 @@ fn convert_lane_to_key_side(lane: Option<NonZeroU8>) -> (StandardKey, PlayerSide
 
     // Convert lane to key
     let key = match adjusted_lane {
-        1 => StandardKey::Key(1),
-        2 => StandardKey::Key(2),
-        3 => StandardKey::Key(3),
-        4 => StandardKey::Key(4),
-        5 => StandardKey::Key(5),
-        6 => StandardKey::Key(6),
-        7 => StandardKey::Key(7),
-        8 => StandardKey::Scratch(1),
-        _ => StandardKey::Key(1), // Default fallback
+        1 => Key::Key(1),
+        2 => Key::Key(2),
+        3 => Key::Key(3),
+        4 => Key::Key(4),
+        5 => Key::Key(5),
+        6 => Key::Key(6),
+        7 => Key::Key(7),
+        8 => Key::Scratch(1),
+        _ => Key::Key(1), // Default fallback
     };
 
     (key, side)

@@ -294,9 +294,6 @@ pub enum Key<const KEY_COUNT: u8, const SCRATCH_COUNT: u8> {
     FreeZone,
 }
 
-/// Default Key type with 7 keys and 1 scratch
-pub type StandardKey = Key<7, 1>;
-
 impl<const KEY_COUNT: u8, const SCRATCH_COUNT: u8> Key<{ KEY_COUNT }, { SCRATCH_COUNT }> {
     /// Returns whether the key expected a piano keyboard.
     pub const fn is_keyxx(&self) -> bool {
