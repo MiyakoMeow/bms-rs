@@ -31,16 +31,19 @@ impl TokenProcessor for MetadataProcessor {
         prompter: &P,
     ) -> TokenProcessorResult<Self::Output> {
         let mut metadata = Metadata::default();
-        all_tokens(input, prompter, |token| {
+        let ((), warnings) = all_tokens(input, prompter, |token| {
             Ok(match token {
                 Token::Header { name, args } => self
                     .on_header(name.as_ref(), args.as_ref(), &mut metadata)
-                    .err(),
-                Token::Message { .. } => None,
-                Token::NotACommand(line) => self.on_comment(line, &mut metadata).err(),
+                    .map_err(|e| (Some(e), vec![]))
+                    .map(|()| (None, vec![])),
+                Token::Message { .. } => Ok((None, vec![])),
+                Token::NotACommand(line) => self.on_comment(line, &mut metadata)
+                    .map_err(|e| (Some(e), vec![]))
+                    .map(|()| (None, vec![])),
             })
         })?;
-        Ok(metadata)
+        Ok((metadata, warnings))
     }
 }
 

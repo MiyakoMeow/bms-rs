@@ -27,15 +27,16 @@ impl TokenProcessor for MusicInfoProcessor {
         prompter: &P,
     ) -> TokenProcessorResult<Self::Output> {
         let mut music_info = MusicInfo::default();
-        all_tokens(input, prompter, |token| {
+        let ((), warnings) = all_tokens(input, prompter, |token| {
             Ok(match token {
                 Token::Header { name, args } => self
                     .on_header(name.as_ref(), args.as_ref(), &mut music_info)
-                    .err(),
-                Token::Message { .. } | Token::NotACommand(_) => None,
+                    .map_err(|e| (Some(e), vec![]))
+                    .map(|()| (None, vec![])),
+                Token::Message { .. } | Token::NotACommand(_) => Ok((None, vec![])),
             })
         })?;
-        Ok(music_info)
+        Ok((music_info, warnings))
     }
 }
 

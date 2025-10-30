@@ -43,7 +43,7 @@ impl TokenProcessor for VideoProcessor {
         prompter: &P,
     ) -> TokenProcessorResult<Self::Output> {
         let mut video = Video::default();
-        all_tokens_with_range(input, prompter, |token| {
+        let ((), warnings) = all_tokens_with_range(input, prompter, |token| {
             Ok(match token.content() {
                 Token::Header { name, args } => self
                     .on_header(name.as_ref(), args.as_ref(), prompter, &mut video)
@@ -64,7 +64,7 @@ impl TokenProcessor for VideoProcessor {
                 Token::NotACommand(_) => None,
             })
         })?;
-        Ok(video)
+        Ok((video, warnings))
     }
 }
 

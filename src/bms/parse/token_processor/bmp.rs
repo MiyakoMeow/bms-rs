@@ -55,11 +55,12 @@ impl TokenProcessor for BmpProcessor {
         prompter: &P,
     ) -> TokenProcessorResult<Self::Output> {
         let mut objects = BmpObjects::default();
-        all_tokens_with_range(input, prompter, |token| {
+        let ((), warnings) = all_tokens_with_range(input, prompter, |token| {
             Ok(match token.content() {
                 Token::Header { name, args } => self
                     .on_header(name.as_ref(), args.as_ref(), prompter, &mut objects)
-                    .err(),
+                    .map_err(|e| (Some(e), vec![]))
+                    .map(|()| (None, vec![])),
                 Token::Message {
                     track,
                     channel,
@@ -72,11 +73,11 @@ impl TokenProcessor for BmpProcessor {
                         prompter,
                         &mut objects,
                     )
-                    .err(),
-                Token::NotACommand(_) => None,
+                    .map(|msg_warnings| (None, msg_warnings)),
+                Token::NotACommand(_) => Ok((None, vec![])),
             })
         })?;
-        Ok(objects)
+        Ok((objects, warnings))
     }
 }
 
@@ -400,14 +401,16 @@ impl BmpProcessor {
         message: SourceRangeMixin<&str>,
         prompter: &impl Prompter,
         objects: &mut BmpObjects,
-    ) -> Result<()> {
+    ) -> Result<Vec<ParseWarningWithRange>> {
+        let mut warnings = Vec::new();
         match channel {
             channel @ (Channel::BgaBase
             | Channel::BgaPoor
             | Channel::BgaLayer
             | Channel::BgaLayer2) => {
-                for (time, obj) in
-                    parse_obj_ids(track, message, prompter, &self.case_sensitive_obj_id)
+                let (mut obj_warnings, obj_iter) = parse_obj_ids(track, message, &self.case_sensitive_obj_id);
+                warnings.extend(obj_warnings);
+                for (time, obj) in obj_iter
                 {
                     if !objects.bmp_files.contains_key(&obj) {
                         return Err(ParseWarning::UndefinedObject(obj));
@@ -481,6 +484,6 @@ impl BmpProcessor {
             }
             _ => {}
         }
-        Ok(())
+        Ok(warnings)
     }
 }

@@ -28,7 +28,7 @@ impl TokenProcessor for SectionLenProcessor {
         prompter: &P,
     ) -> TokenProcessorResult<Self::Output> {
         let mut objects = SectionLenObjects::default();
-        all_tokens(input, prompter, |token| {
+        let ((), warnings) = all_tokens(input, prompter, |token| {
             Ok(match token {
                 Token::Message {
                     track,
@@ -36,11 +36,11 @@ impl TokenProcessor for SectionLenProcessor {
                     message,
                 } => self
                     .on_message(*track, *channel, message.as_ref(), prompter, &mut objects)
-                    .err(),
+                    .map(|msg_warnings| (None, msg_warnings)),
                 Token::Header { .. } | Token::NotACommand(_) => None,
             })
         })?;
-        Ok(objects)
+        Ok((objects, warnings))
     }
 }
 
@@ -52,7 +52,7 @@ impl SectionLenProcessor {
         message: &str,
         prompter: &impl Prompter,
         objects: &mut SectionLenObjects,
-    ) -> Result<()> {
+    ) -> Result<Vec<ParseWarningWithRange>> {
         if channel == Channel::SectionLen {
             let message = filter_message(message);
             let message = message.as_ref();
@@ -68,6 +68,6 @@ impl SectionLenProcessor {
             }
             objects.push_section_len_change(SectionLenChangeObj { track, length }, prompter)?;
         }
-        Ok(())
+        Ok(vec![])
     }
 }

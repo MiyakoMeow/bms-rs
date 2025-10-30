@@ -243,7 +243,10 @@ pub fn parse_bms<T: KeyLayoutMapper, P: Prompter, R: Rng>(
     // Convert lex warnings to BmsWarning
     let mut warnings: Vec<BmsWarning> = lex_warnings.into_iter().map(BmsWarning::Lex).collect();
 
-    let bms = Bms::from_token_stream::<'_, T, _, _>(&tokens, config)?;
+    // Convert parse warnings to BmsWarning
+    warnings.extend(parse_warnings.into_iter().map(BmsWarning::Parse));
+
+    let ParseOutput { bms, parse_warnings } = Bms::from_token_stream::<'_, T, _, _>(&tokens, config)?;
 
     let PlayingCheckOutput {
         playing_warnings,

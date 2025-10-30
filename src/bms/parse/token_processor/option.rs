@@ -42,11 +42,12 @@ impl TokenProcessor for OptionProcessor {
         prompter: &P,
     ) -> TokenProcessorResult<Self::Output> {
         let mut objects = OptionObjects::default();
-        all_tokens_with_range(input, prompter, |token| {
+        let ((), warnings) = all_tokens_with_range(input, prompter, |token| {
             Ok(match token.content() {
                 Token::Header { name, args } => self
                     .on_header(name.as_ref(), args.as_ref(), prompter, &mut objects)
-                    .err(),
+                    .map_err(|e| (Some(e), vec![]))
+                    .map(|()| (None, vec![])),
                 Token::Message {
                     track,
                     channel,
@@ -59,11 +60,11 @@ impl TokenProcessor for OptionProcessor {
                         prompter,
                         &mut objects,
                     )
-                    .err(),
-                Token::NotACommand(_) => None,
+                    .map(|msg_warnings| (None, msg_warnings)),
+                Token::NotACommand(_) => Ok((None, vec![])),
             })
         })?;
-        Ok(objects)
+        Ok((objects, warnings))
     }
 }
 
@@ -105,11 +106,12 @@ impl OptionProcessor {
         message: SourceRangeMixin<&str>,
         prompter: &impl Prompter,
         objects: &mut OptionObjects,
-    ) -> Result<()> {
+    ) -> Result<Vec<ParseWarningWithRange>> {
+        let mut warnings = Vec::new();
         if channel == Channel::OptionChange {
-            for (time, option_id) in
-                parse_obj_ids(track, message, prompter, &self.case_sensitive_obj_id)
-            {
+            let (mut obj_warnings, obj_iter) = parse_obj_ids(track, message, &self.case_sensitive_obj_id);
+            warnings.extend(obj_warnings);
+            for (time, option_id) in obj_iter {
                 let option = objects
                     .change_options
                     .get(&option_id)
@@ -118,6 +120,6 @@ impl OptionProcessor {
                 objects.push_option_event(OptionObj { time, option }, prompter)?;
             }
         }
-        Ok(())
+        Ok(warnings)
     }
 }

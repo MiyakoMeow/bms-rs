@@ -53,7 +53,7 @@ impl<T: KeyLayoutMapper> TokenProcessor for WavProcessor<T> {
         prompter: &P,
     ) -> TokenProcessorResult<Self::Output> {
         let mut objects = WavObjects::default();
-        all_tokens_with_range(input, prompter, |token| {
+        let ((), warnings) = all_tokens_with_range(input, prompter, |token| {
             Ok(match token.content() {
                 Token::Header { name, args } => self
                     .on_header(name.as_ref(), args.as_ref(), prompter, &mut objects)
@@ -74,7 +74,7 @@ impl<T: KeyLayoutMapper> TokenProcessor for WavProcessor<T> {
                 Token::NotACommand(_) => None,
             })
         })?;
-        Ok(objects)
+        Ok((objects, warnings))
     }
 }
 

@@ -26,15 +26,16 @@ impl TokenProcessor for ResourcesProcessor {
         prompter: &P,
     ) -> TokenProcessorResult<Self::Output> {
         let mut resources = Resources::default();
-        all_tokens(input, prompter, |token| {
+        let ((), warnings) = all_tokens(input, prompter, |token| {
             Ok(match token {
                 Token::Header { name, args } => self
                     .on_header(name.as_ref(), args.as_ref(), &mut resources)
-                    .err(),
-                Token::Message { .. } | Token::NotACommand(_) => None,
+                    .map_err(|e| (Some(e), vec![]))
+                    .map(|()| (None, vec![])),
+                Token::Message { .. } | Token::NotACommand(_) => Ok((None, vec![])),
             })
         })?;
-        Ok(resources)
+        Ok((resources, warnings))
     }
 }
 

@@ -41,12 +41,15 @@ impl Bms {
     pub fn from_token_stream<'a, T: KeyLayoutMapper, P: Prompter, R: Rng>(
         token_iter: impl IntoIterator<Item = &'a TokenWithRange<'a>>,
         config: ParseConfig<T, P, R>,
-    ) -> core::result::Result<Bms, ParseErrorWithRange> {
+    ) -> core::result::Result<ParseOutput, ParseErrorWithRange> {
         let tokens: Vec<_> = token_iter.into_iter().collect();
         let mut tokens_slice = tokens.as_slice();
         let (proc, prompter) = config.build();
-        let bms = proc.process(&mut tokens_slice, &prompter)?;
-        Ok(bms)
+        let (bms, parse_warnings) = proc.process(&mut tokens_slice, &prompter)?;
+        Ok(ParseOutput {
+            bms,
+            parse_warnings,
+        })
     }
 }
 
