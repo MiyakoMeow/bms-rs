@@ -8,11 +8,15 @@
 use std::{borrow::Cow, cell::RefCell, rc::Rc};
 
 use itertools::Itertools;
+use lazy_errors::{ErrorStash, StashErr};
 
 use crate::bms::{
     parse::{ParseError, ParseErrorWithRange, ParseWarningWithRange},
     prelude::*,
 };
+
+type LazyError = lazy_errors::Error<ParseErrorWithRange>;
+pub(crate) type LazyResult<T> = core::result::Result<T, LazyError>;
 
 mod bmp;
 mod bpm;
@@ -100,18 +104,23 @@ impl<'a, 't, P> ProcessContext<'a, 't, P> {
     }
 
     /// Iterates over all remaining tokens and collects warnings from the handler.
-    pub fn all_tokens<F, I>(&mut self, mut f: F) -> Result<(), ParseErrorWithRange>
+    pub fn all_tokens<F, I>(&mut self, mut f: F) -> LazyResult<()>
     where
         F: FnMut(&'a TokenWithRange<'t>, &P) -> Result<I, ParseError>,
         I: IntoIterator<Item = ParseWarningWithRange>,
     {
         let view = self.take_input();
         let prompter = self.prompter;
-        for token in view.iter().copied() {
-            let warns = f(token, prompter).map_err(|e| e.into_wrapper(token))?;
+        let mut errs = ErrorStash::new(|| LazyError::from_message("parse errors"));
+        for warns in view
+            .iter()
+            .copied()
+            .map(|token| f(token, prompter).map_err(|e| e.into_wrapper(token)))
+            .stash_err(&mut errs)
+        {
             self.reported.extend(warns);
         }
-        Ok(())
+        errs.into()
     }
 }
 
@@ -124,7 +133,7 @@ pub trait TokenProcessor {
     fn process<'a, 't, P: Prompter>(
         &self,
         ctx: &mut ProcessContext<'a, 't, P>,
-    ) -> Result<Self::Output, ParseErrorWithRange>;
+    ) -> LazyResult<Self::Output>;
 
     /// Creates a processor [`SequentialProcessor`] which does `self` then `second`.
     fn then<S>(self, second: S) -> SequentialProcessor<Self, S>
@@ -157,7 +166,7 @@ impl<T: TokenProcessor + ?Sized> TokenProcessor for Box<T> {
     fn process<'a, 't, P: Prompter>(
         &self,
         ctx: &mut ProcessContext<'a, 't, P>,
-    ) -> Result<Self::Output, ParseErrorWithRange> {
+    ) -> LazyResult<Self::Output> {
         T::process(self, ctx)
     }
 }
@@ -179,7 +188,7 @@ where
     fn process<'a, 't, P: Prompter>(
         &self,
         ctx: &mut ProcessContext<'a, 't, P>,
-    ) -> Result<Self::Output, ParseErrorWithRange> {
+    ) -> LazyResult<Self::Output> {
         let checkpoint = ctx.save();
         let first_output = self.first.process(ctx)?;
         ctx.restore(checkpoint);
@@ -205,7 +214,7 @@ where
     fn process<'a, 't, P: Prompter>(
         &self,
         ctx: &mut ProcessContext<'a, 't, P>,
-    ) -> Result<Self::Output, ParseErrorWithRange> {
+    ) -> LazyResult<Self::Output> {
         let res = self.source.process(ctx)?;
         Ok((self.mapping)(res))
     }

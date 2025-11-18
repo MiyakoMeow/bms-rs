@@ -19,11 +19,11 @@
 
 use std::{cell::RefCell, marker::PhantomData, path::Path, rc::Rc};
 
+use super::LazyResult;
 use super::{
     super::prompt::{DefDuplication, Prompter},
     ProcessContext, TokenProcessor, parse_obj_ids,
 };
-use crate::bms::parse::ParseErrorWithRange;
 use crate::{
     bms::{
         model::wav::WavObjects,
@@ -55,7 +55,7 @@ impl<T: KeyLayoutMapper> TokenProcessor for WavProcessor<T> {
     fn process<'a, 't, P: Prompter>(
         &self,
         ctx: &mut ProcessContext<'a, 't, P>,
-    ) -> core::result::Result<Self::Output, ParseErrorWithRange> {
+    ) -> LazyResult<Self::Output> {
         let mut objects = WavObjects::default();
         ctx.all_tokens(|token, prompter| match token.content() {
             Token::Header { name, args } => {

@@ -47,6 +47,7 @@ use self::{
     },
     prelude::*,
 };
+use crate::bms::parse::token_processor::LazyResult;
 
 /// Decimal type used throughout the BMS module.
 ///
@@ -206,7 +207,7 @@ impl<T, P, R> ParseConfig<T, P, R> {
             fn process<'a, 't, P: Prompter>(
                 &self,
                 ctx: &mut parse::token_processor::ProcessContext<'a, 't, P>,
-            ) -> Result<Self::Output, ParseErrorWithRange> {
+            ) -> LazyResult<Self::Output> {
                 if self.use_minor {
                     minor_preset::<T, R>(Rc::clone(&self.rng), self.use_relaxed).process(ctx)
                 } else {
@@ -275,7 +276,7 @@ pub fn parse_bms<T: KeyLayoutMapper, P: Prompter, R: Rng>(
 #[must_use]
 pub struct BmsOutput {
     /// The parsed BMS data.
-    pub bms: Result<Bms, ParseErrorWithRange>,
+    pub bms: core::result::Result<Bms, ParseErrorWithRange>,
     /// Warnings that occurred during parsing.
     pub warnings: Vec<BmsWarning>,
 }

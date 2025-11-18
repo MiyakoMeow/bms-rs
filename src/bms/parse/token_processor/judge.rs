@@ -10,8 +10,8 @@ use std::{cell::RefCell, rc::Rc, str::FromStr};
 
 use fraction::GenericFraction;
 
+use super::LazyResult;
 use super::{super::prompt::Prompter, ProcessContext, TokenProcessor, parse_obj_ids};
-use crate::bms::ParseErrorWithRange;
 use crate::{
     bms::{
         model::judge::JudgeObjects,
@@ -41,7 +41,7 @@ impl TokenProcessor for JudgeProcessor {
     fn process<'a, 't, P: Prompter>(
         &self,
         ctx: &mut ProcessContext<'a, 't, P>,
-    ) -> core::result::Result<Self::Output, ParseErrorWithRange> {
+    ) -> LazyResult<Self::Output> {
         let mut objects = JudgeObjects::default();
         ctx.all_tokens(|token, prompter| match token.content() {
             Token::Header { name, args } => {
@@ -135,7 +135,7 @@ impl JudgeProcessor {
         message: SourceRangeMixin<&str>,
         prompter: &impl Prompter,
         objects: &mut JudgeObjects,
-    ) -> core::result::Result<Vec<ParseWarningWithRange>, ParseWarning> {
+    ) -> Result<Vec<ParseWarningWithRange>> {
         let mut warnings: Vec<ParseWarningWithRange> = Vec::new();
         if channel == Channel::Judge {
             let (pairs, w) = parse_obj_ids(track, message, &self.case_sensitive_obj_id);

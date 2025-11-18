@@ -14,8 +14,8 @@ use fraction::GenericFraction;
 
 use num::BigUint;
 
+use super::LazyResult;
 use super::{super::prompt::Prompter, ProcessContext, TokenProcessor};
-use crate::bms::ParseErrorWithRange;
 use crate::{
     bms::{
         model::video::Video,
@@ -45,7 +45,7 @@ impl TokenProcessor for VideoProcessor {
     fn process<'a, 't, P: Prompter>(
         &self,
         ctx: &mut ProcessContext<'a, 't, P>,
-    ) -> core::result::Result<Self::Output, ParseErrorWithRange> {
+    ) -> LazyResult<Self::Output> {
         let mut video = Video::default();
         ctx.all_tokens(|token, prompter| match token.content() {
             Token::Header { name, args } => {

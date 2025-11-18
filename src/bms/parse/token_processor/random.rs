@@ -53,6 +53,7 @@ use crate::{
     util::StrExtension,
 };
 
+use super::LazyResult;
 use super::{ProcessContext, TokenProcessor};
 
 /// It processes `#RANDOM` and `#SWITCH` control commands.
@@ -582,7 +583,7 @@ impl<R: Rng, N: TokenProcessor> TokenProcessor for RandomTokenProcessor<R, N> {
     fn process<'a, 't, P: Prompter>(
         &self,
         ctx: &mut ProcessContext<'a, 't, P>,
-    ) -> Result<Self::Output, crate::bms::parse::ParseErrorWithRange> {
+    ) -> LazyResult<Self::Output> {
         let checkpoint = ctx.save();
         let mut activated: Vec<&'a TokenWithRange<'t>> = Vec::new();
         ctx.all_tokens(|token, _prompter| {

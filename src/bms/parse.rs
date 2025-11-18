@@ -147,7 +147,13 @@ impl Bms {
         let mut tokens_slice = tokens.as_slice();
         let (proc, prompter) = config.build();
         let mut ctx = ProcessContext::new(&mut tokens_slice, &prompter);
-        let res = proc.process(&mut ctx);
+        let res_lazy = proc.process(&mut ctx);
+        let res = res_lazy.map_err(|err| {
+            err.children()
+                .first()
+                .cloned()
+                .expect("lazy_errors returned Err without children")
+        });
         ParseOutput {
             bms: res,
             parse_warnings: ctx.into_warnings(),
