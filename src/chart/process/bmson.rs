@@ -13,12 +13,11 @@ use strict_num_extended::{FinF64, NonNegativeF64, PositiveF64};
 use crate::bms::prelude::{BgaLayer, Key, NoteKind, PlayerSide};
 use crate::bmson::prelude::*;
 use crate::chart::event::{ChartEvent, FlowEvent, PlayheadEvent};
+use crate::chart::formula::{BmsonResolution, pulses_to_y};
 use crate::chart::process::{
     AllEventsIndex, BmpId, ChartEventIdGenerator, ChartResources, Process, WavId,
 };
-use crate::chart::{
-    Chart, DEFAULT_SPEED, MAX_FIN_F64, MAX_NON_NEGATIVE_F64, TimeSpan, YCoordinate,
-};
+use crate::chart::{Chart, DEFAULT_SPEED, MAX_NON_NEGATIVE_F64, TimeSpan, YCoordinate};
 use crate::util::StrExtension;
 
 /// BMSON format parser.
@@ -37,14 +36,8 @@ impl BmsonProcessor {
     pub fn parse(bmson: &Bmson<'_>) -> Chart {
         let init_bpm: PositiveF64 =
             PositiveF64::new(bmson.info.init_bpm.as_f64()).expect("init_bpm should be positive");
-        let pulses_denom = FinF64::new((4 * bmson.info.resolution.get()) as f64)
-            .expect("pulses_denom should be finite");
-        let pulses_to_y = |pulses: i64| -> YCoordinate {
-            YCoordinate::new(
-                NonNegativeF64::new(pulses as f64 / pulses_denom.as_f64())
-                    .unwrap_or(MAX_NON_NEGATIVE_F64),
-            )
-        };
+        let resolution = BmsonResolution::new(bmson.info.resolution.get());
+        let pulses_to_y = |pulses: i64| -> YCoordinate { pulses_to_y(pulses as u64, resolution) };
 
         // Preprocessing: assign IDs to all audio and image resources
         let mut audio_name_to_id = HashMap::new();
@@ -164,21 +157,8 @@ impl AllEventsIndex {
         bmp_name_to_id: &HashMap<String, BmpId>,
     ) -> Self {
         use std::collections::BTreeSet;
-        let denom =
-            FinF64::new((4 * bmson.info.resolution.get()) as f64).expect("denom should be finite");
-        let denom_inv = if denom.as_f64() == 0.0 {
-            FinF64::ZERO
-        } else {
-            FinF64::new(1.0 / denom.as_f64()).expect("denom_inv should be finite")
-        };
-        let pulses_to_y = |pulses: u64| -> YCoordinate {
-            let pulses = FinF64::new(pulses as f64).expect("pulses should be finite");
-            let y: NonNegativeF64 = (pulses * denom_inv)
-                .unwrap_or(MAX_FIN_F64)
-                .try_into()
-                .unwrap_or(MAX_NON_NEGATIVE_F64);
-            YCoordinate::new(y)
-        };
+        let resolution = BmsonResolution::new(bmson.info.resolution.get());
+        let pulses_to_y = |pulses: u64| -> YCoordinate { pulses_to_y(pulses, resolution) };
         let mut points: BTreeSet<YCoordinate> = BTreeSet::new();
         points.insert(YCoordinate::ZERO);
         for SoundChannel { notes, .. } in &bmson.sound_channels {

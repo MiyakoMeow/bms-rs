@@ -7,11 +7,12 @@
 pub use super::Chart;
 pub use super::event::FlowEvent;
 pub use super::event::YCoordinate;
+pub use super::formula::DisplayRatio;
+pub use super::formula::VisibleRangePerBpm;
 pub use super::player::base_bpm::BaseBpm;
 pub use super::player::base_bpm::{
     BaseBpmGenerator, ManualBpmGenerator, MaxBpmGenerator, MinBpmGenerator, StartBpmGenerator,
 };
-pub use super::player::{DisplayRatio, VisibleRangePerBpm};
 pub use super::process::{
     AllEventsIndex, BmpId, ChartEventId, ChartEventIdGenerator, ChartResources, Process, WavId,
 };

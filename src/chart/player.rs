@@ -10,6 +10,7 @@ use gametime::{TimeSpan, TimeStamp};
 use strict_num_extended::{FinF64, NonNegativeF64, PositiveF64};
 
 use crate::chart::event::{ChartEvent, FlowEvent, PlayheadEvent, YCoordinate};
+use crate::chart::formula::{DisplayRatio, VelocityCalculator, VisibleRangePerBpm};
 use crate::chart::{Chart, MAX_FIN_F64, MAX_NON_NEGATIVE_F64};
 
 pub mod base_bpm;
@@ -28,8 +29,7 @@ pub struct ChartPlayer<'a> {
     pub(crate) visibility_range: (Bound<FinF64>, Bound<FinF64>),
 
     // Performance: velocity caching
-    cached_velocity: Option<FinF64>,
-    velocity_dirty: bool,
+    velocity_calculator: VelocityCalculator,
 
     // Event management
     pub(crate) preloaded_events: Vec<PlayheadEvent>,
@@ -86,8 +86,7 @@ impl<'a> ChartPlayer<'a> {
             last_poll_at: start_time,
             visible_range_per_bpm,
             visibility_range: (Bound::Included(FinF64::ZERO), Bound::Included(FinF64::ONE)),
-            cached_velocity: None,
-            velocity_dirty: true,
+            velocity_calculator: VelocityCalculator::new(),
             preloaded_events: Vec::new(),
             processed_flow_y: BTreeSet::new(),
             playback_state: PlaybackState::new(
@@ -335,37 +334,16 @@ impl<'a> ChartPlayer<'a> {
     ///
     /// See [`crate::chart`] for the formula.
     pub fn calculate_velocity(&mut self, speed: PositiveF64) -> FinF64 {
-        if self.velocity_dirty || self.cached_velocity.is_none() {
-            let computed = self.compute_velocity(speed);
-            self.cached_velocity = Some(computed);
-            self.velocity_dirty = false;
-            computed
-        } else if let Some(cached) = self.cached_velocity {
-            cached
-        } else {
-            // This should not happen as we checked is_none above
-            self.compute_velocity(speed)
-        }
-    }
-
-    /// Compute velocity without caching (internal use).
-    fn compute_velocity(&self, speed: PositiveF64) -> FinF64 {
-        let current_bpm = self.playback_state.current_bpm;
-        let playback_ratio = self.playback_state.playback_ratio;
-
-        if current_bpm.as_f64() <= 0.0 {
-            FinF64::new(f64::EPSILON).unwrap_or(FinF64::ZERO)
-        } else {
-            let base = FinF64::new(current_bpm.as_f64() / 240.0).unwrap_or(FinF64::ZERO);
-            let v1 = (base * speed).unwrap_or(MAX_FIN_F64);
-            let v = (v1 * playback_ratio).unwrap_or(MAX_FIN_F64);
-            FinF64::new(v.as_f64().max(f64::EPSILON)).unwrap_or(MAX_FIN_F64)
-        }
+        self.velocity_calculator.calculate(
+            speed,
+            self.playback_state.current_bpm,
+            self.playback_state.playback_ratio,
+        )
     }
 
     /// Mark velocity cache as dirty.
     pub const fn mark_velocity_dirty(&mut self) {
-        self.velocity_dirty = true;
+        self.velocity_calculator.mark_dirty();
     }
 
     /// Get the next flow event after the given Y position (exclusive).
@@ -685,193 +663,6 @@ impl PlaybackState {
     }
 }
 
-/// Visible range per BPM, representing the relationship between BPM and visible Y range.
-/// See [`crate::chart`] for the formula.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct VisibleRangePerBpm {
-    value: FinF64,
-    base_bpm: FinF64,
-    reaction_time_seconds: FinF64,
-}
-
-impl AsRef<FinF64> for VisibleRangePerBpm {
-    fn as_ref(&self) -> &FinF64 {
-        &self.value
-    }
-}
-
-impl VisibleRangePerBpm {
-    /// Create a new `VisibleRangePerBpm` from base BPM and reaction time.
-    /// See [`crate::chart`] for the formula.
-    #[must_use]
-    pub fn new(base_bpm: &PositiveF64, reaction_time: TimeSpan) -> Self {
-        // Check for effectively zero BPM to avoid division by extremely small numbers
-        if base_bpm.as_f64() <= f64::EPSILON {
-            Self {
-                value: FinF64::ZERO,
-                base_bpm: FinF64::ZERO,
-                reaction_time_seconds: FinF64::ZERO,
-            }
-        } else {
-            let reaction_time_seconds =
-                FinF64::new(reaction_time.as_secs_f64().max(0.0)).unwrap_or(FinF64::ZERO);
-            // Calculate value step by step with overflow protection
-            // Formula: reaction_time_seconds * 240.0 / base_bpm
-            let step1 = FinF64::new(reaction_time_seconds.as_f64() * 240.0).unwrap_or(MAX_FIN_F64);
-            let value = FinF64::new(step1.as_f64() / base_bpm.as_f64()).unwrap_or(MAX_FIN_F64);
-            Self {
-                value,
-                base_bpm: FinF64::new(base_bpm.as_f64()).unwrap_or(FinF64::ONE),
-                reaction_time_seconds,
-            }
-        }
-    }
-
-    /// Returns a reference to the contained value.
-    #[must_use]
-    pub const fn value(&self) -> &FinF64 {
-        &self.value
-    }
-
-    /// Consumes self and returns the contained value.
-    #[must_use]
-    pub const fn into_value(self) -> FinF64 {
-        self.value
-    }
-
-    /// Calculate visible window length in y units based on current BPM, speed, and playback ratio.
-    /// See [`crate::chart`] for formula.
-    /// This ensures events stay in visible window for exactly `reaction_time` duration.
-    #[must_use]
-    pub fn window_y(
-        &self,
-        current_bpm: PositiveF64,
-        current_speed: PositiveF64,
-        playback_ratio: FinF64,
-    ) -> YCoordinate {
-        // Check for invalid BPM early
-        if current_bpm.as_f64() <= f64::EPSILON {
-            return YCoordinate::ZERO;
-        }
-
-        // Calculate speed factor with overflow protection
-        let speed_factor =
-            FinF64::new(current_speed.as_f64() * playback_ratio.as_f64()).unwrap_or(MAX_FIN_F64);
-
-        // Goal: time = reaction_time * base_bpm / current_bpm
-        // velocity = (current_bpm / 240) * speed_factor
-        // visible_window_y = velocity * time
-        //                  = (current_bpm / 240) * speed_factor * reaction_time * base_bpm / current_bpm
-        //                  = (speed_factor / 240) * reaction_time * base_bpm
-
-        // Calculate velocity step by step with overflow checks
-        let bpm_div_240 = FinF64::new(current_bpm.as_f64() / 240.0).unwrap_or(MAX_FIN_F64);
-        let velocity =
-            FinF64::new(bpm_div_240.as_f64() * speed_factor.as_f64()).unwrap_or(MAX_FIN_F64);
-
-        // Calculate adjusted value step by step to catch overflow early
-        // Formula: velocity * reaction_time_seconds * base_bpm / current_bpm
-        let step1 = FinF64::new(velocity.as_f64() * self.reaction_time_seconds.as_f64())
-            .unwrap_or(MAX_FIN_F64);
-        let step2 = FinF64::new(step1.as_f64() * self.base_bpm.as_f64()).unwrap_or(MAX_FIN_F64);
-        let adjusted = FinF64::new(step2.as_f64() / current_bpm.as_f64()).unwrap_or(MAX_FIN_F64);
-
-        YCoordinate::new(NonNegativeF64::new(adjusted.as_f64()).unwrap_or(MAX_NON_NEGATIVE_F64))
-    }
-
-    /// Calculate reaction time from visible range per BPM.
-    /// See [`crate::chart`] for the formula.
-    #[must_use]
-    pub fn to_reaction_time(&self) -> TimeSpan {
-        if self.reaction_time_seconds.as_f64() == 0.0 {
-            TimeSpan::ZERO
-        } else {
-            TimeSpan::from_duration(Duration::from_secs_f64(self.reaction_time_seconds.as_f64()))
-        }
-    }
-}
-
-impl From<FinF64> for VisibleRangePerBpm {
-    fn from(value: FinF64) -> Self {
-        let base_bpm = FinF64::ONE;
-        let reaction_time_seconds = (value / 240.0).unwrap_or(FinF64::ZERO);
-        Self {
-            value,
-            base_bpm,
-            reaction_time_seconds,
-        }
-    }
-}
-
-impl From<VisibleRangePerBpm> for FinF64 {
-    fn from(value: VisibleRangePerBpm) -> Self {
-        value.value
-    }
-}
-
-/// Display ratio wrapper type, representing the actual position of a note in the display area.
-///
-/// 0 is the judgment line, 1 is the position where the note generally starts to appear.
-/// See [`crate::chart`] for the formula.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
-pub struct DisplayRatio(pub FinF64);
-
-impl AsRef<FinF64> for DisplayRatio {
-    fn as_ref(&self) -> &FinF64 {
-        &self.0
-    }
-}
-
-impl DisplayRatio {
-    /// Create a new `DisplayRatio`
-    #[must_use]
-    pub const fn new(value: FinF64) -> Self {
-        Self(value)
-    }
-
-    /// Returns a reference to the contained value.
-    #[must_use]
-    pub const fn value(&self) -> &FinF64 {
-        &self.0
-    }
-
-    /// Consumes self and returns the contained value.
-    #[must_use]
-    pub const fn into_value(self) -> FinF64 {
-        self.0
-    }
-
-    /// Create a `DisplayRatio` representing the judgment line (value 0)
-    #[must_use]
-    pub const fn at_judgment_line() -> Self {
-        Self(FinF64::ZERO)
-    }
-
-    /// Create a `DisplayRatio` representing the position where note starts to appear (value 1)
-    #[must_use]
-    pub const fn at_appearance() -> Self {
-        Self(FinF64::ONE)
-    }
-}
-
-impl From<FinF64> for DisplayRatio {
-    fn from(value: FinF64) -> Self {
-        Self(value)
-    }
-}
-
-impl From<DisplayRatio> for FinF64 {
-    fn from(value: DisplayRatio) -> Self {
-        value.0
-    }
-}
-
-impl From<f64> for DisplayRatio {
-    fn from(value: f64) -> Self {
-        Self(FinF64::new(value).unwrap_or(FinF64::ZERO))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::{BTreeMap, HashMap};
@@ -961,7 +752,6 @@ mod tests {
         player.apply_flow_event(&FlowEvent::Bpm(TEST_BPM));
 
         assert!((player.playback_state().current_bpm.as_f64() - 180.0).abs() < f64::EPSILON);
-        assert!(player.velocity_dirty);
     }
 
     #[test]

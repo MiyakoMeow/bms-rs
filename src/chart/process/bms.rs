@@ -13,6 +13,7 @@ use crate::bms::command::StringValue;
 use crate::bms::parse::check_playing::PlayingError;
 use crate::bms::prelude::*;
 use crate::chart::event::{ChartEvent, FlowEvent, PlayheadEvent};
+use crate::chart::formula::convert_stop_duration_to_beats;
 use crate::chart::process::{
     AllEventsIndex, BmpId, ChartEventIdGenerator, ChartResources, Process, WavId,
 };
@@ -26,18 +27,6 @@ use strict_num_extended::NonNegativeF64;
 /// This struct serves as a namespace for BMS parsing functions.
 /// It parses BMS files and returns a `Chart` containing all precomputed data.
 pub struct BmsProcessor;
-
-/// Convert STOP duration from 192nd-note units to beats (measure units).
-///
-/// In 4/4 time signature:
-/// - 192nd-note represents 1/192 of a whole note
-/// - One measure (4/4) = 4 beats = 192/48 beats
-/// - Therefore: 1 unit of 192nd-note = 1/48 beat
-/// - Formula: beats = `192nd_note_value` / 48
-#[must_use]
-fn convert_stop_duration_to_beats(duration_192nd: NonNegativeF64) -> NonNegativeF64 {
-    NonNegativeF64::new(duration_192nd.as_f64() / 48.0).unwrap_or(NonNegativeF64::ZERO)
-}
 
 impl BmsProcessor {
     /// Parse BMS file and return a `Chart` containing all precomputed data.
